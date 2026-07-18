@@ -2,21 +2,29 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Дверь предков — VR (WebXR)</title>
+<title>Дверь предков — VR v2 (WebXR)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <style>
   .hud-hint{
     position:fixed; top:12px; left:50%; transform:translateX(-50%);
-    background:rgba(0,0,0,.6); color:#e8c187; font-family:Arial,sans-serif;
-    padding:8px 16px; border-radius:20px; font-size:14px; z-index:10; pointer-events:none;
+    background:rgba(0,0,0,.65); color:#e8c187; font-family:Arial,sans-serif;
+    padding:8px 16px; border-radius:20px; font-size:13px; z-index:10; pointer-events:none;
+    text-align:center; max-width:90vw;
+  }
+  #motion-btn{
+    position:fixed; bottom:70px; left:50%; transform:translateX(-50%);
+    background:#c9954f; color:#1a1410; border:none; font-weight:bold;
+    padding:12px 22px; border-radius:24px; font-size:15px; z-index:11; display:none;
+    font-family:Arial,sans-serif;
   }
 </style>
 </head>
 <body>
-<div class="hud-hint">ПК: мышь + WASD, клик по меткам · VR: наведи луч контроллера и нажми триггер</div>
+<div class="hud-hint" id="hint">Обернись, найди светящуюся дверь башни и нажми на неё · ПК: клик мышью, WASD · VR: удержи взгляд на двери</div>
+<button id="motion-btn">Разрешить датчики движения</button>
 
-<a-scene background="color: #0a0910" fog="type: exponential; color: #0a0910; density: 0.06" renderer="colorManagement: true">
+<a-scene background="color: #070810" renderer="colorManagement: true">
 
   <a-assets>
     <a-mixin id="hotspot-glow"
@@ -25,111 +33,180 @@
       animation__pulse="property: scale; from: 1 1 1; to: 1.35 1.35 1.35; dir: alternate; loop: true; dur: 900; easing: easeInOutSine"></a-mixin>
   </a-assets>
 
-  <!-- ================= TOWER INTERIOR ================= -->
-  <!-- floor -->
-  <a-circle rotation="-90 0 0" radius="4.2" color="#2a2622" roughness="1"></a-circle>
-  <!-- tower wall: open-ended cylinder, seen from inside -->
-  <a-cylinder radius="4.2" height="7" open-ended="true" position="0 3.5 0"
-    material="color: #3b352c; side: back; roughness: 1"></a-cylinder>
-  <!-- ceiling -->
-  <a-circle rotation="90 0 0" radius="4.2" position="0 7 0" color="#1c1915"></a-circle>
+  <!-- ======================================================= -->
+  <!-- ==================  EXTERIOR (intro)  ================= -->
+  <!-- ======================================================= -->
+  <a-entity id="exterior">
+    <!-- night sky stars -->
+    <a-entity id="stars"></a-entity>
+    <!-- moon -->
+    <a-sphere position="18 22 -34" radius="1.6"
+      material="color: #f2ecd9; emissive: #d8d2bd; emissiveIntensity: 0.9"></a-sphere>
+    <!-- ground -->
+    <a-circle rotation="-90 0 0" radius="60" color="#11131a"></a-circle>
+    <!-- mountain silhouettes: rings of cones -->
+    <a-entity id="mountains"></a-entity>
 
-  <!-- stone texture illusion: rings of slightly offset boxes -->
-  <a-entity id="stones"></a-entity>
-
-  <!-- loophole light beams -->
-  <a-cone position="1.8 4.6 -3.4" rotation="55 20 0" radius-bottom="0.9" radius-top="0.05" height="4"
-    material="color: #ffe9bd; opacity: 0.10; transparent: true; depthWrite: false"></a-cone>
-  <a-cone position="-2.6 5 2" rotation="55 -140 0" radius-bottom="0.7" radius-top="0.05" height="3.5"
-    material="color: #ffe9bd; opacity: 0.08; transparent: true; depthWrite: false"></a-cone>
-
-  <!-- lights -->
-  <a-entity light="type: ambient; color: #5a4d3d; intensity: 0.5"></a-entity>
-  <a-entity id="fire-light" light="type: point; color: #ff9c3f; intensity: 1.1; distance: 8" position="1.6 0.7 -2.2"></a-entity>
-  <a-entity light="type: point; color: #bcd4ff; intensity: 0.35; distance: 10" position="-2 5 2"></a-entity>
-
-  <!-- ================= HEARTH (hotspot 1) ================= -->
-  <a-entity position="1.6 0 -2.2">
-    <a-cylinder radius="0.5" height="0.25" color="#4a423a" position="0 0.12 0"></a-cylinder>
-    <!-- fire -->
-    <a-cone position="0 0.45 0" radius-bottom="0.22" radius-top="0.02" height="0.5"
-      material="color: #ff8c2b; emissive: #ff6a00; emissiveIntensity: 1; opacity: 0.95"
-      animation="property: scale; from: 1 1 1; to: 0.85 1.25 0.85; dir: alternate; loop: true; dur: 260"></a-cone>
-    <a-cone position="0.06 0.4 0.04" radius-bottom="0.12" radius-top="0.01" height="0.34"
-      material="color: #ffd257; emissive: #ffb300; emissiveIntensity: 1; opacity: 0.9"
-      animation="property: scale; from: 1 1 1; to: 1.2 0.8 1.2; dir: alternate; loop: true; dur: 200"></a-cone>
-    <a-sphere class="clickable" data-id="hearth" mixin="hotspot-glow" position="0 1.1 0"></a-sphere>
-  </a-entity>
-
-  <!-- ================= WEAPON NICHE (hotspot 2) ================= -->
-  <a-entity position="-3.6 1.6 -1.4" rotation="0 70 0">
-    <a-box width="0.12" height="1.1" depth="0.28" color="#2e2822"></a-box>
-    <!-- sheathed shashka: elongated box + hilt -->
-    <a-box position="0.12 0 0" width="0.06" height="0.95" depth="0.1" color="#5a3d24" rotation="0 0 8"></a-box>
-    <a-sphere position="0.16 0.5 0" radius="0.06" color="#c9954f" metalness="0.6" roughness="0.3"></a-sphere>
-    <a-sphere class="clickable" data-id="weapon" mixin="hotspot-glow" position="0.35 0 0.25"></a-sphere>
-  </a-entity>
-
-  <!-- ================= TAMGA CARVING (hotspot 3) ================= -->
-  <a-entity position="2.9 2.6 2.6" rotation="0 -130 0">
-    <a-plane width="0.8" height="0.8" color="#453e33"></a-plane>
-    <a-torus position="0 0 0.03" radius="0.2" radius-tubular="0.02" color="#c9954f"
-      material="emissive: #7a5a2e; emissiveIntensity: 0.4"></a-torus>
-    <a-box position="0 0 0.03" width="0.05" height="0.44" depth="0.02" color="#c9954f" rotation="0 0 45"></a-box>
-    <a-box position="0 0 0.03" width="0.05" height="0.44" depth="0.02" color="#c9954f" rotation="0 0 -45"></a-box>
-    <a-sphere class="clickable" data-id="tamga" mixin="hotspot-glow" position="0 0 0.45"></a-sphere>
-  </a-entity>
-
-  <!-- ================= DOOR (finale portal) ================= -->
-  <a-entity id="door-group" position="0 0 3.9" rotation="0 180 0">
-    <!-- frame -->
-    <a-box position="-0.65 1.1 0" width="0.18" height="2.3" depth="0.25" color="#4a4238"></a-box>
-    <a-box position="0.65 1.1 0" width="0.18" height="2.3" depth="0.25" color="#4a4238"></a-box>
-    <a-box position="0 2.28 0" width="1.5" height="0.18" depth="0.25" color="#4a4238"></a-box>
-    <!-- door leaf, pivoted -->
-    <a-entity id="door-pivot" position="-0.56 0 0">
-      <a-box id="door-leaf" position="0.56 1.08 0" width="1.1" height="2.14" depth="0.09"
-        color="#3a2a1c" material="roughness: 0.9"></a-box>
+    <!-- tower exterior -->
+    <a-entity position="0 0 -6">
+      <a-cylinder radius="2.6" height="9" position="0 4.5 0" color="#23201a" roughness="1"></a-cylinder>
+      <a-cone position="0 9.9 0" radius-bottom="2.9" radius-top="0.2" height="1.9" color="#1a1712"></a-cone>
+      <!-- lit loopholes -->
+      <a-plane position="0.9 6.2 2.47" rotation="0 -20 0" width="0.16" height="0.5"
+        material="color: #ffca6a; emissive: #ff9d2e; emissiveIntensity: 1"></a-plane>
+      <a-plane position="-1.1 7.4 2.35" rotation="0 25 0" width="0.16" height="0.5"
+        material="color: #ffca6a; emissive: #ff9d2e; emissiveIntensity: 1"></a-plane>
+      <!-- entry door (clickable) -->
+      <a-entity position="0 0 2.56">
+        <a-box position="-0.62 1.05 0" width="0.16" height="2.2" depth="0.18" color="#3d362c"></a-box>
+        <a-box position="0.62 1.05 0" width="0.16" height="2.2" depth="0.18" color="#3d362c"></a-box>
+        <a-box position="0 2.2 0" width="1.44" height="0.16" depth="0.18" color="#3d362c"></a-box>
+        <a-box id="entry-door" class="clickable" data-id="enter" position="0 1.03 0" width="1.08" height="2.06" depth="0.1"
+          material="color: #4a3520; emissive: #c9954f; emissiveIntensity: 0.25"
+          animation__breathe="property: material.emissiveIntensity; from: 0.15; to: 0.55; dir: alternate; loop: true; dur: 1400"></a-box>
+        <a-text value="Войди в башню" align="center" color="#e8c187" position="0 2.6 0.2" width="4"></a-text>
+      </a-entity>
+      <a-entity light="type: point; color: #ffb75e; intensity: 0.9; distance: 7" position="0 1.4 3.4"></a-entity>
     </a-entity>
-    <!-- bright "campus" behind the door, hidden until finale -->
-    <a-entity id="campus" visible="false" position="0 1.1 0.6">
-      <a-plane width="1.15" height="2.16" material="color: #fdf3dc; emissive: #ffedc0; emissiveIntensity: 1"></a-plane>
-      <a-text value="ЧГУ сегодня" color="#8a6a30" align="center" position="0 0.75 0.02" width="2.2"></a-text>
-      <a-box position="0 -0.1 0.05" width="0.55" height="0.7" depth="0.02" color="#ffffff"></a-box>
-      <a-box position="0 0.18 0.06" width="0.62" height="0.08" depth="0.02" color="#d8b06a"></a-box>
-      <a-cone position="-0.35 -0.35 0.06" radius-bottom="0.09" radius-top="0.01" height="0.3" color="#4c7a4c"></a-cone>
-      <a-cone position="0.37 -0.33 0.06" radius-bottom="0.08" radius-top="0.01" height="0.26" color="#548454"></a-cone>
+
+    <a-entity light="type: ambient; color: #2c3350; intensity: 0.8"></a-entity>
+    <a-entity light="type: directional; color: #aab6d8; intensity: 0.35" position="10 20 -10"></a-entity>
+  </a-entity>
+
+  <!-- ======================================================= -->
+  <!-- ==================  INTERIOR  ========================= -->
+  <!-- ======================================================= -->
+  <a-entity id="interior" visible="false">
+    <a-entity id="interior-fog"></a-entity>
+    <a-circle rotation="-90 0 0" radius="4.2" color="#2a2622" roughness="1"></a-circle>
+    <a-cylinder radius="4.2" height="7" open-ended="true" position="0 3.5 0"
+      material="color: #3b352c; side: back; roughness: 1"></a-cylinder>
+    <a-circle rotation="90 0 0" radius="4.2" position="0 7 0" color="#1c1915"></a-circle>
+    <a-entity id="stones"></a-entity>
+
+    <!-- ceiling wooden beams -->
+    <a-box position="0 6.7 0" width="8.2" height="0.22" depth="0.3" color="#241d15" rotation="0 25 0"></a-box>
+    <a-box position="0 6.7 0" width="8.2" height="0.22" depth="0.3" color="#282117" rotation="0 -35 0"></a-box>
+
+    <!-- loophole windows with night sky -->
+    <a-entity position="0 4.8 -4.12" rotation="0 0 0">
+      <a-plane width="0.3" height="0.8" material="color: #0b1030; emissive: #1a2a55; emissiveIntensity: 0.6"></a-plane>
+      <a-circle position="0.06 0.18 0.01" radius="0.03" material="color:#fff; emissive:#fff; emissiveIntensity:1"></a-circle>
     </a-entity>
+    <a-entity position="-3.55 5.2 2.05" rotation="0 120 0">
+      <a-plane width="0.3" height="0.8" material="color: #0b1030; emissive: #1a2a55; emissiveIntensity: 0.6"></a-plane>
+    </a-entity>
+
+    <!-- light beams -->
+    <a-cone position="1.8 4.6 -3.4" rotation="55 20 0" radius-bottom="0.9" radius-top="0.05" height="4"
+      material="color: #ffe9bd; opacity: 0.10; transparent: true; depthWrite: false"></a-cone>
+    <a-cone position="-2.6 5 2" rotation="55 -140 0" radius-bottom="0.7" radius-top="0.05" height="3.5"
+      material="color: #bcd4ff; opacity: 0.07; transparent: true; depthWrite: false"></a-cone>
+
+    <!-- lights -->
+    <a-entity light="type: ambient; color: #5a4d3d; intensity: 0.45"></a-entity>
+    <a-entity id="fire-light" light="type: point; color: #ff9c3f; intensity: 1.1; distance: 8" position="1.6 0.7 -2.2"></a-entity>
+    <a-entity light="type: point; color: #bcd4ff; intensity: 0.3; distance: 10" position="-2 5 2"></a-entity>
+
+    <!-- ======= HEARTH ======= -->
+    <a-entity position="1.6 0 -2.2">
+      <a-cylinder radius="0.5" height="0.25" color="#4a423a" position="0 0.12 0"></a-cylinder>
+      <a-torus rotation="-90 0 0" position="0 0.26 0" radius="0.44" radius-tubular="0.05" color="#37302a"></a-torus>
+      <a-cone id="flame1" position="0 0.5 0" radius-bottom="0.22" radius-top="0.02" height="0.5"
+        material="color: #ff8c2b; emissive: #ff6a00; emissiveIntensity: 1; opacity: 0.95"
+        animation="property: scale; from: 1 1 1; to: 0.85 1.25 0.85; dir: alternate; loop: true; dur: 260"></a-cone>
+      <a-cone position="0.06 0.45 0.04" radius-bottom="0.12" radius-top="0.01" height="0.34"
+        material="color: #ffd257; emissive: #ffb300; emissiveIntensity: 1; opacity: 0.9"
+        animation="property: scale; from: 1 1 1; to: 1.2 0.8 1.2; dir: alternate; loop: true; dur: 200"></a-cone>
+      <a-entity id="embers"></a-entity>
+      <a-sphere class="clickable" data-id="hearth" mixin="hotspot-glow" position="0 1.15 0"></a-sphere>
+      <a-text class="hotspot-label" value="Очаг" align="center" color="#e8c187" position="0 1.45 0" width="3"
+        look-at-camera></a-text>
+      <!-- copper jug beside -->
+      <a-cylinder position="0.75 0.18 0.3" radius="0.1" height="0.28" color="#8a5a2e" metalness="0.5" roughness="0.4"></a-cylinder>
+      <a-sphere position="0.75 0.36 0.3" radius="0.08" color="#8a5a2e" metalness="0.5" roughness="0.4"></a-sphere>
+    </a-entity>
+
+    <!-- ======= WEAPON NICHE ======= -->
+    <a-entity position="-3.6 1.6 -1.4" rotation="0 70 0">
+      <a-box width="0.12" height="1.1" depth="0.28" color="#2e2822"></a-box>
+      <a-box position="0.12 0 0" width="0.06" height="0.95" depth="0.1" color="#5a3d24" rotation="0 0 8"></a-box>
+      <a-sphere position="0.16 0.5 0" radius="0.06" color="#c9954f" metalness="0.6" roughness="0.3"></a-sphere>
+      <!-- round shield -->
+      <a-circle position="0.05 -0.85 0.1" rotation="0 15 0" radius="0.34" color="#4a3a26"></a-circle>
+      <a-sphere position="0.05 -0.85 0.14" radius="0.06" color="#c9954f" metalness="0.5"></a-sphere>
+      <a-sphere class="clickable" data-id="weapon" mixin="hotspot-glow" position="0.35 0 0.25"></a-sphere>
+      <a-text class="hotspot-label" value="Оружие рода" align="center" color="#e8c187" position="0.35 0.35 0.25" width="3"></a-text>
+    </a-entity>
+
+    <!-- ======= TAMGA ======= -->
+    <a-entity position="2.9 2.6 2.6" rotation="0 -130 0">
+      <a-plane width="0.8" height="0.8" color="#453e33"></a-plane>
+      <a-torus position="0 0 0.03" radius="0.2" radius-tubular="0.02" color="#c9954f"
+        material="emissive: #7a5a2e; emissiveIntensity: 0.4"></a-torus>
+      <a-box position="0 0 0.03" width="0.05" height="0.44" depth="0.02" color="#c9954f" rotation="0 0 45"></a-box>
+      <a-box position="0 0 0.03" width="0.05" height="0.44" depth="0.02" color="#c9954f" rotation="0 0 -45"></a-box>
+      <a-sphere class="clickable" data-id="tamga" mixin="hotspot-glow" position="0 0 0.45"></a-sphere>
+      <a-text class="hotspot-label" value="Тамга" align="center" color="#e8c187" position="0 0.55 0.45" width="3"></a-text>
+    </a-entity>
+
+    <!-- ======= carpet ======= -->
+    <a-entity position="-0.6 0.01 0.8" rotation="-90 12 0">
+      <a-plane width="1.7" height="1.1" color="#5e2f26"></a-plane>
+      <a-plane position="0 0 0.005" width="1.4" height="0.82" material="color: #7a4030"></a-plane>
+      <a-plane position="0 0 0.01" width="1.05" height="0.5" material="color: #8f5a35"></a-plane>
+      <a-torus position="0 0 0.015" radius="0.16" radius-tubular="0.015" color="#d8b06a"></a-torus>
+    </a-entity>
+
+    <!-- ======= EXIT DOOR (finale portal) ======= -->
+    <a-entity id="door-group" position="0 0 3.9" rotation="0 180 0">
+      <a-box position="-0.65 1.1 0" width="0.18" height="2.3" depth="0.25" color="#4a4238"></a-box>
+      <a-box position="0.65 1.1 0" width="0.18" height="2.3" depth="0.25" color="#4a4238"></a-box>
+      <a-box position="0 2.28 0" width="1.5" height="0.18" depth="0.25" color="#4a4238"></a-box>
+      <a-entity id="door-pivot" position="-0.56 0 0">
+        <a-box id="door-leaf" position="0.56 1.08 0" width="1.1" height="2.14" depth="0.09"
+          color="#3a2a1c" material="roughness: 0.9"></a-box>
+      </a-entity>
+      <a-entity id="campus" visible="false" position="0 1.1 0.6">
+        <a-plane width="1.15" height="2.16" material="color: #fdf3dc; emissive: #ffedc0; emissiveIntensity: 1"></a-plane>
+        <a-text value="ЧГУ сегодня" color="#8a6a30" align="center" position="0 0.75 0.02" width="2.2"></a-text>
+        <a-box position="0 -0.1 0.05" width="0.55" height="0.7" depth="0.02" color="#ffffff"></a-box>
+        <a-box position="0 0.18 0.06" width="0.62" height="0.08" depth="0.02" color="#d8b06a"></a-box>
+        <a-cone position="-0.35 -0.35 0.06" radius-bottom="0.09" radius-top="0.01" height="0.3" color="#4c7a4c"></a-cone>
+        <a-cone position="0.37 -0.33 0.06" radius-bottom="0.08" radius-top="0.01" height="0.26" color="#548454"></a-cone>
+      </a-entity>
+    </a-entity>
+
   </a-entity>
 
-  <!-- ================= INFO PANEL ================= -->
-  <a-entity id="info-panel" visible="false" position="0 1.7 -1.6">
-    <a-plane width="1.7" height="0.95" color="#1e1b22" material="opacity: 0.94"
-      geometry="primitive: plane"></a-plane>
-    <a-text id="info-title" value="" color="#e8c187" align="center" position="0 0.3 0.01" width="1.6"
-      font="https://cdn.aframe.io/fonts/Exo2Bold.fnt"></a-text>
-    <a-text id="info-text" value="" color="#f3efe9" align="center" position="0 -0.05 0.01" width="1.45"
-      wrap-count="38"></a-text>
-    <a-plane class="clickable" data-id="close" position="0 -0.36 0.02" width="0.5" height="0.14" color="#c9954f">
-      <a-text value="Закрыть" color="#1a1410" align="center" position="0 0 0.01" width="1.2"></a-text>
-    </a-plane>
-  </a-entity>
-
-  <!-- ================= HUD progress (attached to camera) ================= -->
-  <a-entity id="rig" position="0 0 0.5">
+  <!-- ================= RIG ================= -->
+  <!-- spawn facing away from the door: user must turn around to find it -->
+  <a-entity id="rig" position="0 0 0.5" rotation="0 180 0">
     <a-camera wasd-controls-enabled="true" look-controls>
-      <a-text id="hud-progress" value="Найдено: 0/3" color="#e8c187" position="-0.28 -0.32 -0.8" width="0.9"></a-text>
-      <!-- gaze cursor fallback (fuse) — works without controllers -->
-      <a-cursor fuse="true" fuse-timeout="1200"
+      <a-text id="hud-progress" value="" color="#e8c187" position="-0.28 -0.32 -0.8" width="0.9"></a-text>
+      <!-- gaze cursor: fuse is OFF on desktop, enabled only in VR mode (see JS) -->
+      <a-cursor id="gaze-cursor" fuse="false" fuse-timeout="1600"
         material="color: #e8c187; shader: flat"
-        animation__fusing="property: scale; startEvents: fusing; from: 1 1 1; to: 0.4 0.4 0.4; dur: 1200"
+        animation__fusing="property: scale; startEvents: fusing; from: 1 1 1; to: 0.4 0.4 0.4; dur: 1600"
         animation__reset="property: scale; startEvents: mouseleave; to: 1 1 1; dur: 150"
         raycaster="objects: .clickable"></a-cursor>
+      <!-- info panel is attached to camera: always in view when opened -->
+      <a-entity id="info-panel" visible="false" position="0 -0.05 -1.35" scale="0.8 0.8 0.8">
+        <a-plane width="1.7" height="0.95" color="#1e1b22" material="opacity: 0.94"></a-plane>
+        <a-plane position="0 0.475 0.005" width="1.7" height="0.06" color="#c9954f"></a-plane>
+        <a-text id="info-title" value="" color="#e8c187" align="center" position="0 0.3 0.01" width="1.6"></a-text>
+        <a-text id="info-text" value="" color="#f3efe9" align="center" position="0 -0.05 0.01" width="1.45" wrap-count="38"></a-text>
+        <a-plane class="clickable" data-id="close" position="0 -0.36 0.02" width="0.5" height="0.14" color="#c9954f">
+          <a-text value="Закрыть" color="#1a1410" align="center" position="0 0 0.01" width="1.2"></a-text>
+        </a-plane>
+      </a-entity>
     </a-camera>
-    <!-- VR controllers with laser -->
     <a-entity laser-controls="hand: right" raycaster="objects: .clickable; lineColor: #e8c187; lineOpacity: 0.7"></a-entity>
     <a-entity laser-controls="hand: left" raycaster="objects: .clickable; lineColor: #e8c187; lineOpacity: 0.7"></a-entity>
   </a-entity>
+
+  <!-- mouse click support on desktop -->
+  <a-entity cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
 
 </a-scene>
 
@@ -151,10 +228,65 @@ const STORIES = {
 
 const found = new Set();
 let finaleShown = false;
+let inside = false;
 
-/* --- audio (synth, no files) --- */
-let actx;
-function ctx(){ if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)(); return actx; }
+/* ================= AUDIO (fully synthesized) ================= */
+let actx, windGain, fireGain;
+function ctx(){
+  if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)();
+  if(actx.state === "suspended") actx.resume();
+  return actx;
+}
+/* unlock audio on ANY real user gesture (autoplay policy) */
+["pointerdown","touchstart","keydown"].forEach(ev=>{
+  window.addEventListener(ev, ()=>{ try{ ctx(); }catch(e){} }, { once:false, passive:true });
+});
+
+function makeNoiseBuffer(c){
+  const len = c.sampleRate * 2;
+  const buf = c.createBuffer(1, len, c.sampleRate);
+  const data = buf.getChannelData(0);
+  for(let i=0;i<len;i++) data[i] = Math.random()*2-1;
+  return buf;
+}
+function startAmbience(){
+  try{
+    const c = ctx();
+    if(windGain) return;
+    const noise = makeNoiseBuffer(c);
+
+    // wind: looped noise through slow-moving lowpass
+    const windSrc = c.createBufferSource();
+    windSrc.buffer = noise; windSrc.loop = true;
+    const windFilter = c.createBiquadFilter();
+    windFilter.type = "lowpass"; windFilter.frequency.value = 300;
+    windGain = c.createGain(); windGain.gain.value = 0.035;
+    windSrc.connect(windFilter); windFilter.connect(windGain); windGain.connect(c.destination);
+    windSrc.start();
+    // slow wind swell
+    setInterval(()=>{
+      const t = c.currentTime;
+      windFilter.frequency.linearRampToValueAtTime(150+Math.random()*350, t+2.5);
+      windGain.gain.linearRampToValueAtTime(0.02+Math.random()*0.03, t+2.5);
+    }, 2600);
+
+    // fire crackle: bandpassed noise bursts (only audible inside)
+    const fireSrc = c.createBufferSource();
+    fireSrc.buffer = noise; fireSrc.loop = true; fireSrc.playbackRate.value = 0.7;
+    const fireFilter = c.createBiquadFilter();
+    fireFilter.type = "bandpass"; fireFilter.frequency.value = 2400; fireFilter.Q.value = 0.8;
+    fireGain = c.createGain(); fireGain.gain.value = 0;
+    fireSrc.connect(fireFilter); fireFilter.connect(fireGain); fireGain.connect(c.destination);
+    fireSrc.start();
+    setInterval(()=>{
+      if(!inside) return;
+      const t = c.currentTime;
+      fireGain.gain.setValueAtTime(0.008, t);
+      fireGain.gain.linearRampToValueAtTime(0.03+Math.random()*0.04, t+0.03);
+      fireGain.gain.exponentialRampToValueAtTime(0.008, t+0.12);
+    }, 180);
+  }catch(e){}
+}
 function chime(freqs){
   try{
     const c = ctx();
@@ -169,7 +301,19 @@ function chime(freqs){
     });
   }catch(e){}
 }
-
+function creak(){
+  try{
+    const c = ctx();
+    const o=c.createOscillator(), g=c.createGain();
+    o.type="sawtooth";
+    o.frequency.setValueAtTime(150,c.currentTime);
+    o.frequency.exponentialRampToValueAtTime(55,c.currentTime+1);
+    g.gain.setValueAtTime(0.05,c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+1.1);
+    o.connect(g); g.connect(c.destination);
+    o.start(); o.stop(c.currentTime+1.1);
+  }catch(e){}
+}
 function speak(text){
   if(!("speechSynthesis" in window)) return;
   speechSynthesis.cancel();
@@ -180,8 +324,71 @@ function speak(text){
   speechSynthesis.speak(u);
 }
 
-/* --- build stone ring decorations --- */
+/* ================= SCENE BUILD ================= */
 window.addEventListener("DOMContentLoaded", () => {
+  const sceneEl = document.querySelector("a-scene");
+  const exterior = document.getElementById("exterior");
+  const interior = document.getElementById("interior");
+  const hint = document.getElementById("hint");
+  const hud = document.getElementById("hud-progress");
+  const rig = document.getElementById("rig");
+  const gazeCursor = document.getElementById("gaze-cursor");
+
+  /* gaze-fuse ONLY in VR mode: prevents phantom auto-clicks on desktop */
+  sceneEl.addEventListener("enter-vr", ()=>{ gazeCursor.setAttribute("cursor","fuse: true; fuseTimeout: 1600"); });
+  sceneEl.addEventListener("exit-vr", ()=>{ gazeCursor.setAttribute("cursor","fuse: false"); });
+
+  /* simple "physics": clamp the rig inside walkable bounds */
+  setInterval(()=>{
+    const p = rig.object3D.position;
+    p.y = 0;
+    const r = Math.sqrt(p.x*p.x + p.z*p.z);
+    const maxR = inside ? 3.3 : 25;   // tower inner radius / exterior bounds
+    if(r > maxR){ p.x *= maxR/r; p.z *= maxR/r; }
+    if(!inside){
+      // keep player out of the tower shell while outside (tower at 0,0,-6, radius 2.6)
+      const dx = p.x - 0, dz = p.z - (-6);
+      const dr = Math.sqrt(dx*dx + dz*dz);
+      if(dr < 3.1){ const k = 3.1/dr; p.x = dx*k; p.z = -6 + dz*k; }
+    }
+  }, 50);
+
+  /* stars */
+  const stars = document.getElementById("stars");
+  for(let i=0;i<120;i++){
+    const s = document.createElement("a-circle");
+    const theta = Math.random()*Math.PI*2;
+    const phi = Math.random()*Math.PI*0.42;
+    const r = 55;
+    const x = Math.cos(theta)*Math.cos(phi)*r;
+    const y = Math.sin(phi)*r + 2;
+    const z = Math.sin(theta)*Math.cos(phi)*r;
+    s.setAttribute("position",`${x} ${y} ${z}`);
+    s.setAttribute("radius", 0.05+Math.random()*0.1);
+    s.setAttribute("material","color:#ffffff; emissive:#ffffff; emissiveIntensity:0.9; side:double");
+    s.object3D && s.object3D.lookAt(0,1,0);
+    s.setAttribute("look-at","");
+    stars.appendChild(s);
+  }
+  // make stars face center
+  setTimeout(()=>{ stars.querySelectorAll("a-circle").forEach(el=>{ el.object3D.lookAt(0,2,0); }); }, 800);
+
+  /* mountains */
+  const mtn = document.getElementById("mountains");
+  for(let i=0;i<14;i++){
+    const a = (i/14)*Math.PI*2;
+    const r = 38 + Math.random()*10;
+    const cone = document.createElement("a-cone");
+    const h = 8+Math.random()*10;
+    cone.setAttribute("position", `${Math.cos(a)*r} ${h/2-0.5} ${Math.sin(a)*r}`);
+    cone.setAttribute("radius-bottom", 9+Math.random()*6);
+    cone.setAttribute("radius-top", 0.3);
+    cone.setAttribute("height", h);
+    cone.setAttribute("color", "#0e1118");
+    mtn.appendChild(cone);
+  }
+
+  /* interior stone rings */
   const stones = document.getElementById("stones");
   for(let ring=0; ring<8; ring++){
     const y = 0.4 + ring*0.85;
@@ -199,14 +406,71 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  /* embers above fire */
+  const embers = document.getElementById("embers");
+  const emberEls = [];
+  for(let i=0;i<10;i++){
+    const e = document.createElement("a-sphere");
+    e.setAttribute("radius","0.015");
+    e.setAttribute("material","color:#ffb347; emissive:#ff7a1a; emissiveIntensity:1");
+    embers.appendChild(e);
+    emberEls.push({el:e, t:Math.random()*2, speed:0.5+Math.random()*0.7, dx:(Math.random()-0.5)*0.3});
+  }
+  setInterval(()=>{
+    emberEls.forEach(o=>{
+      o.t += 0.05*o.speed;
+      if(o.t>1.6){ o.t=0; o.dx=(Math.random()-0.5)*0.3; }
+      const y = 0.5 + o.t;
+      const fade = Math.max(0, 1-o.t/1.6);
+      o.el.setAttribute("position", `${o.dx*o.t} ${y} ${o.dx*o.t*0.5}`);
+      o.el.setAttribute("material", `color:#ffb347; emissive:#ff7a1a; emissiveIntensity:${fade}; opacity:${fade}; transparent:true`);
+    });
+  }, 50);
+
+  /* flickering fire light */
+  const fireLight = document.getElementById("fire-light");
+  setInterval(()=>{
+    if(!inside) return;
+    fireLight.setAttribute("light", `type: point; color: #ff9c3f; intensity: ${0.9+Math.random()*0.5}; distance: 8`);
+  }, 120);
+
+  /* labels always face camera */
+  const cam = document.querySelector("a-camera");
+  setInterval(()=>{
+    document.querySelectorAll(".hotspot-label").forEach(l=>{
+      if(l.object3D && cam.object3D){
+        const wp = new THREE.Vector3();
+        cam.object3D.getWorldPosition(wp);
+        l.object3D.lookAt(wp);
+      }
+    });
+  }, 300);
+
+  /* ============ interactions ============ */
   const panel = document.getElementById("info-panel");
   const titleEl = document.getElementById("info-title");
   const textEl = document.getElementById("info-text");
-  const hud = document.getElementById("hud-progress");
+
+  function enterTower(){
+    if(inside) return;
+    inside = true;
+    startAmbience();
+    creak();
+    rig.object3D.position.set(0, 0, 0.5); // reset to tower centre
+    exterior.setAttribute("visible","false");
+    interior.setAttribute("visible","true");
+    sceneEl.setAttribute("fog","type: exponential; color: #0a0910; density: 0.055");
+    hud.setAttribute("value","Найдено: 0/3");
+    hint.textContent = "Найди три светящихся знака: очаг, оружие, тамга";
+    setTimeout(()=>speak("Ты внутри боевой башни. Найди три знака, которые хранит этот дом."), 900);
+  }
 
   document.querySelectorAll(".clickable").forEach(el=>{
     el.addEventListener("click", ()=>{
       const id = el.dataset.id;
+      startAmbience(); // ensure audio unlocked on first user gesture
+
+      if(id === "enter"){ enterTower(); return; }
 
       if(id === "close"){
         panel.setAttribute("visible","false");
@@ -235,22 +499,34 @@ window.addEventListener("DOMContentLoaded", () => {
   function finale(){
     finaleShown = true;
     chime([880, 1174, 1568]);
-    // door swings open
+    creak();
     const pivot = document.getElementById("door-pivot");
     pivot.setAttribute("animation", "property: rotation; to: 0 -110 0; dur: 2200; easing: easeInOutQuad");
     document.getElementById("campus").setAttribute("visible","true");
-    // warm light floods in
     const flood = document.createElement("a-entity");
     flood.setAttribute("light","type: point; color: #ffe9bd; intensity: 0; distance: 12");
     flood.setAttribute("position","0 1.5 3.2");
     flood.setAttribute("animation","property: light.intensity; to: 1.6; dur: 2500");
-    document.querySelector("a-scene").appendChild(flood);
+    sceneEl.appendChild(flood);
     hud.setAttribute("value","Наследие продолжается ✦");
+    hint.textContent = "Наследие продолжается — обернись к двери";
     setTimeout(()=>speak("Ты нашёл наследие предков. Оно живёт сегодня в стенах Чеченского государственного университета."), 1200);
   }
 
   if("speechSynthesis" in window){
     speechSynthesis.onvoiceschanged = ()=>speechSynthesis.getVoices();
+  }
+
+  /* iOS motion permission */
+  const motionBtn = document.getElementById("motion-btn");
+  if(typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function"){
+    motionBtn.style.display = "block";
+    motionBtn.addEventListener("click", ()=>{
+      DeviceMotionEvent.requestPermission().then(()=>{ motionBtn.style.display="none"; }).catch(()=>{});
+      if(typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function"){
+        DeviceOrientationEvent.requestPermission().catch(()=>{});
+      }
+    });
   }
 });
 </script>
