@@ -5,6 +5,167 @@
 <title>Дверь предков — VR v2 (WebXR)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<script>
+/* Canvas-based text: default A-Frame MSDF fonts lack Cyrillic glyphs */
+AFRAME.registerComponent('ctext', {
+  schema: {
+    value: {default: ''},
+    color: {default: '#ffffff'},
+    width: {default: 1},
+    lineH: {default: 0},   /* if set, world height per text line (overrides width) */
+    wrap:  {default: 0},
+    bold:  {default: false}
+  },
+  update: function(){
+    const d = this.data;
+    const canvas = document.createElement('canvas');
+    const c2 = canvas.getContext('2d');
+    const fontPx = 64;
+    const font = (d.bold ? 'bold ' : '') + fontPx + 'px Arial, sans-serif';
+    let lines = [];
+    if(d.wrap > 0){
+      const words = String(d.value).split(' ');
+      let cur = '';
+      words.forEach(w => {
+        if((cur + ' ' + w).trim().length > d.wrap){ if(cur) lines.push(cur); cur = w; }
+        else cur = (cur + ' ' + w).trim();
+      });
+      if(cur) lines.push(cur);
+    } else lines = [String(d.value)];
+    if(!lines.length) lines = [''];
+    c2.font = font;
+    let maxW = 10;
+    lines.forEach(l => { maxW = Math.max(maxW, c2.measureText(l).width); });
+    const pad = 20, lh = fontPx * 1.3;
+    canvas.width = Math.ceil(maxW + pad*2);
+    canvas.height = Math.ceil(lines.length * lh + pad*2);
+    c2.font = font;
+    c2.textAlign = 'center';
+    c2.textBaseline = 'middle';
+    c2.fillStyle = d.color;
+    lines.forEach((l,i) => c2.fillText(l, canvas.width/2, pad + lh*(i+0.5)));
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.minFilter = THREE.LinearFilter;
+    tex.anisotropy = 4;
+    let w, h;
+    if(d.lineH > 0){
+      h = (canvas.height / lh) * d.lineH;
+      w = h * canvas.width / canvas.height;
+    } else {
+      w = d.width;
+      h = d.width * canvas.height / canvas.width;
+    }
+    this.el.setAttribute('geometry', {primitive:'plane', width: w, height: h});
+    this.el.setAttribute('material', {shader:'flat', transparent:true, side:'double'});
+    const apply = () => {
+      const mesh = this.el.getObject3D('mesh');
+      if(!mesh) return false;
+      mesh.material.map = tex;
+      mesh.material.transparent = true;
+      mesh.material.needsUpdate = true;
+      return true;
+    };
+    if(!apply()) this.el.addEventListener('object3dset', () => apply(), {once:true});
+  }
+});
+
+/* Procedural textures (stone / wood / floor) — shared & cached for performance */
+const __texCache = {};
+function makeProcCanvas(type){
+  const c = document.createElement('canvas');
+  c.width = c.height = 512;
+  const x = c.getContext('2d');
+  function noise(n, colors, minS, maxS){
+    for(let i=0;i<n;i++){
+      x.fillStyle = colors[Math.floor(Math.random()*colors.length)];
+      x.globalAlpha = 0.05 + Math.random()*0.1;
+      const s = minS + Math.random()*(maxS-minS);
+      x.beginPath();
+      x.ellipse(Math.random()*512, Math.random()*512, s, s*(0.5+Math.random()), Math.random()*3, 0, 7);
+      x.fill();
+    }
+    x.globalAlpha = 1;
+  }
+  if(type === 'stone' || type === 'floor'){
+    x.fillStyle = type==='stone' ? '#4a443a' : '#332e28';
+    x.fillRect(0,0,512,512);
+    noise(500, ['#5a5346','#3a352c','#6a6152','#2e2a22'], 4, 40);
+    /* mortar joints: offset brick rows */
+    x.strokeStyle = 'rgba(15,13,10,0.75)';
+    x.lineWidth = 5;
+    const rowH = 74;
+    for(let ry=0; ry<=512; ry+=rowH){
+      x.beginPath(); x.moveTo(0,ry); x.lineTo(512,ry); x.stroke();
+      const off = (ry/rowH % 2) * 80;
+      for(let bx=off; bx<=512; bx+=160){
+        x.beginPath(); x.moveTo(bx,ry); x.lineTo(bx,ry+rowH); x.stroke();
+      }
+    }
+    /* chips & cracks */
+    x.strokeStyle = 'rgba(20,17,13,0.4)';
+    x.lineWidth = 2;
+    for(let i=0;i<25;i++){
+      x.beginPath();
+      let px = Math.random()*512, py = Math.random()*512;
+      x.moveTo(px,py);
+      for(let j=0;j<4;j++){ px += (Math.random()-0.5)*50; py += Math.random()*30; x.lineTo(px,py); }
+      x.stroke();
+    }
+    noise(200, ['#7a7060','#241f18'], 2, 10);
+  } else if(type === 'wood'){
+    x.fillStyle = '#4a3520';
+    x.fillRect(0,0,512,512);
+    /* planks */
+    const plankW = 512/4;
+    for(let p=0;p<4;p++){
+      x.fillStyle = `rgba(${58+Math.floor(Math.random()*20)},${40+Math.floor(Math.random()*12)},${22+Math.floor(Math.random()*8)},1)`;
+      x.fillRect(p*plankW+3,0,plankW-6,512);
+      /* grain */
+      for(let g=0; g<18; g++){
+        x.strokeStyle = `rgba(30,20,10,${0.15+Math.random()*0.25})`;
+        x.lineWidth = 1+Math.random()*2;
+        x.beginPath();
+        let gx = p*plankW + 8 + Math.random()*(plankW-16);
+        x.moveTo(gx, 0);
+        for(let s=0; s<8; s++){ x.lineTo(gx + Math.sin(s*1.3+Math.random())*6, s*64+64); }
+        x.stroke();
+      }
+      /* plank gaps */
+      x.fillStyle = 'rgba(10,7,4,0.9)';
+      x.fillRect(p*plankW,0,3,512);
+    }
+    /* nails */
+    x.fillStyle = '#1c1610';
+    for(let p=0;p<4;p++){ for(let ny of [40, 470]){ x.beginPath(); x.arc(p*plankW+plankW/2, ny, 5, 0, 7); x.fill(); } }
+  }
+  return c;
+}
+function getProcTexture(type, rx, ry){
+  const key = type + '|' + rx + '|' + ry;
+  if(__texCache[key]) return __texCache[key];
+  const tex = new THREE.CanvasTexture(makeProcCanvas(type));
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(rx, ry);
+  tex.anisotropy = 4;
+  __texCache[key] = tex;
+  return tex;
+}
+AFRAME.registerComponent('ptex', {
+  schema: { type: {default: 'stone'}, rx: {default: 1}, ry: {default: 1} },
+  init: function(){
+    const tex = getProcTexture(this.data.type, this.data.rx, this.data.ry);
+    const apply = () => {
+      const mesh = this.el.getObject3D('mesh');
+      if(!mesh) return false;
+      mesh.material.map = tex;
+      mesh.material.color.set('#bdb6a8');
+      mesh.material.needsUpdate = true;
+      return true;
+    };
+    if(!apply()) this.el.addEventListener('object3dset', () => apply(), {once:true});
+  }
+});
+</script>
 <style>
   .hud-hint{
     position:fixed; top:12px; left:50%; transform:translateX(-50%);
@@ -27,10 +188,11 @@
 <a-scene background="color: #070810" renderer="colorManagement: true">
 
   <a-assets>
+    <!-- harder mode: small, dim markers with a barely visible slow shimmer -->
     <a-mixin id="hotspot-glow"
-      geometry="primitive: sphere; radius: 0.14"
-      material="color: #e8c187; emissive: #c9954f; emissiveIntensity: 0.9; opacity: 0.85"
-      animation__pulse="property: scale; from: 1 1 1; to: 1.35 1.35 1.35; dir: alternate; loop: true; dur: 900; easing: easeInOutSine"></a-mixin>
+      geometry="primitive: sphere; radius: 0.08"
+      material="color: #e8c187; emissive: #c9954f; emissiveIntensity: 0.35; opacity: 0.45; transparent: true"
+      animation__pulse="property: material.emissiveIntensity; from: 0.15; to: 0.65; dir: alternate; loop: true; dur: 2800; easing: easeInOutSine"></a-mixin>
   </a-assets>
 
   <!-- ======================================================= -->
@@ -49,7 +211,7 @@
 
     <!-- tower exterior -->
     <a-entity position="0 0 -6">
-      <a-cylinder radius="2.6" height="9" position="0 4.5 0" color="#23201a" roughness="1"></a-cylinder>
+      <a-cylinder radius="2.6" height="9" position="0 4.5 0" color="#23201a" roughness="1" ptex="type: stone; rx: 8; ry: 5"></a-cylinder>
       <a-cone position="0 9.9 0" radius-bottom="2.9" radius-top="0.2" height="1.9" color="#1a1712"></a-cone>
       <!-- lit loopholes -->
       <a-plane position="0.9 6.2 2.47" rotation="0 -20 0" width="0.16" height="0.5"
@@ -63,8 +225,9 @@
         <a-box position="0 2.2 0" width="1.44" height="0.16" depth="0.18" color="#3d362c"></a-box>
         <a-box id="entry-door" class="clickable" data-id="enter" position="0 1.03 0" width="1.08" height="2.06" depth="0.1"
           material="color: #4a3520; emissive: #c9954f; emissiveIntensity: 0.25"
+          ptex="type: wood; rx: 1; ry: 1"
           animation__breathe="property: material.emissiveIntensity; from: 0.15; to: 0.55; dir: alternate; loop: true; dur: 1400"></a-box>
-        <a-text value="Войди в башню" align="center" color="#e8c187" position="0 2.6 0.2" width="4"></a-text>
+        <a-entity ctext="value: Войди в башню; color: #e8c187; width: 1.6; bold: true" position="0 2.6 0.2"></a-entity>
       </a-entity>
       <a-entity light="type: point; color: #ffb75e; intensity: 0.9; distance: 7" position="0 1.4 3.4"></a-entity>
     </a-entity>
@@ -78,10 +241,10 @@
   <!-- ======================================================= -->
   <a-entity id="interior" visible="false">
     <a-entity id="interior-fog"></a-entity>
-    <a-circle rotation="-90 0 0" radius="4.2" color="#2a2622" roughness="1"></a-circle>
+    <a-circle rotation="-90 0 0" radius="4.2" color="#2a2622" roughness="1" ptex="type: floor; rx: 4; ry: 4"></a-circle>
     <a-cylinder radius="4.2" height="7" open-ended="true" position="0 3.5 0"
-      material="color: #3b352c; side: back; roughness: 1"></a-cylinder>
-    <a-circle rotation="90 0 0" radius="4.2" position="0 7 0" color="#1c1915"></a-circle>
+      material="color: #3b352c; side: back; roughness: 1" ptex="type: stone; rx: 10; ry: 5"></a-cylinder>
+    <a-circle rotation="90 0 0" radius="4.2" position="0 7 0" color="#1c1915" ptex="type: floor; rx: 3; ry: 3"></a-circle>
     <a-entity id="stones"></a-entity>
 
     <!-- ceiling wooden beams -->
@@ -119,9 +282,8 @@
         material="color: #ffd257; emissive: #ffb300; emissiveIntensity: 1; opacity: 0.9"
         animation="property: scale; from: 1 1 1; to: 1.2 0.8 1.2; dir: alternate; loop: true; dur: 200"></a-cone>
       <a-entity id="embers"></a-entity>
-      <a-sphere class="clickable" data-id="hearth" mixin="hotspot-glow" position="0 1.15 0"></a-sphere>
-      <a-text class="hotspot-label" value="Очаг" align="center" color="#e8c187" position="0 1.45 0" width="3"
-        look-at-camera></a-text>
+      <!-- hidden low, among the fire glow -->
+      <a-sphere class="clickable" data-id="hearth" mixin="hotspot-glow" position="0.38 0.28 0.28"></a-sphere>
       <!-- copper jug beside -->
       <a-cylinder position="0.75 0.18 0.3" radius="0.1" height="0.28" color="#8a5a2e" metalness="0.5" roughness="0.4"></a-cylinder>
       <a-sphere position="0.75 0.36 0.3" radius="0.08" color="#8a5a2e" metalness="0.5" roughness="0.4"></a-sphere>
@@ -135,8 +297,8 @@
       <!-- round shield -->
       <a-circle position="0.05 -0.85 0.1" rotation="0 15 0" radius="0.34" color="#4a3a26"></a-circle>
       <a-sphere position="0.05 -0.85 0.14" radius="0.06" color="#c9954f" metalness="0.5"></a-sphere>
-      <a-sphere class="clickable" data-id="weapon" mixin="hotspot-glow" position="0.35 0 0.25"></a-sphere>
-      <a-text class="hotspot-label" value="Оружие рода" align="center" color="#e8c187" position="0.35 0.35 0.25" width="3"></a-text>
+      <!-- hidden behind the shield, low in shadow -->
+      <a-sphere class="clickable" data-id="weapon" mixin="hotspot-glow" position="0.08 -0.88 0.28"></a-sphere>
     </a-entity>
 
     <!-- ======= TAMGA ======= -->
@@ -146,8 +308,8 @@
         material="emissive: #7a5a2e; emissiveIntensity: 0.4"></a-torus>
       <a-box position="0 0 0.03" width="0.05" height="0.44" depth="0.02" color="#c9954f" rotation="0 0 45"></a-box>
       <a-box position="0 0 0.03" width="0.05" height="0.44" depth="0.02" color="#c9954f" rotation="0 0 -45"></a-box>
-      <a-sphere class="clickable" data-id="tamga" mixin="hotspot-glow" position="0 0 0.45"></a-sphere>
-      <a-text class="hotspot-label" value="Тамга" align="center" color="#e8c187" position="0 0.55 0.45" width="3"></a-text>
+      <!-- tucked below the carving, off-centre -->
+      <a-sphere class="clickable" data-id="tamga" mixin="hotspot-glow" position="0.28 -0.42 0.18"></a-sphere>
     </a-entity>
 
     <!-- ======= carpet ======= -->
@@ -165,11 +327,11 @@
       <a-box position="0 2.28 0" width="1.5" height="0.18" depth="0.25" color="#4a4238"></a-box>
       <a-entity id="door-pivot" position="-0.56 0 0">
         <a-box id="door-leaf" position="0.56 1.08 0" width="1.1" height="2.14" depth="0.09"
-          color="#3a2a1c" material="roughness: 0.9"></a-box>
+          color="#3a2a1c" material="roughness: 0.9" ptex="type: wood; rx: 1; ry: 1"></a-box>
       </a-entity>
       <a-entity id="campus" visible="false" position="0 1.1 0.6">
         <a-plane width="1.15" height="2.16" material="color: #fdf3dc; emissive: #ffedc0; emissiveIntensity: 1"></a-plane>
-        <a-text value="ЧГУ сегодня" color="#8a6a30" align="center" position="0 0.75 0.02" width="2.2"></a-text>
+        <a-entity ctext="value: ЧГУ сегодня; color: #8a6a30; width: 0.95; bold: true" position="0 0.75 0.02"></a-entity>
         <a-box position="0 -0.1 0.05" width="0.55" height="0.7" depth="0.02" color="#ffffff"></a-box>
         <a-box position="0 0.18 0.06" width="0.62" height="0.08" depth="0.02" color="#d8b06a"></a-box>
         <a-cone position="-0.35 -0.35 0.06" radius-bottom="0.09" radius-top="0.01" height="0.3" color="#4c7a4c"></a-cone>
@@ -183,7 +345,7 @@
   <!-- spawn facing away from the door: user must turn around to find it -->
   <a-entity id="rig" position="0 0 0.5" rotation="0 180 0">
     <a-camera wasd-controls-enabled="true" look-controls>
-      <a-text id="hud-progress" value="" color="#e8c187" position="-0.28 -0.32 -0.8" width="0.9"></a-text>
+      <a-entity id="hud-progress" ctext="value: ; color: #e8c187; width: 0.32" position="-0.28 -0.32 -0.8"></a-entity>
       <!-- gaze cursor: fuse is OFF on desktop, enabled only in VR mode (see JS) -->
       <a-cursor id="gaze-cursor" fuse="false" fuse-timeout="1600"
         material="color: #e8c187; shader: flat"
@@ -194,10 +356,11 @@
       <a-entity id="info-panel" visible="false" position="0 -0.05 -1.35" scale="0.8 0.8 0.8">
         <a-plane width="1.7" height="0.95" color="#1e1b22" material="opacity: 0.94"></a-plane>
         <a-plane position="0 0.475 0.005" width="1.7" height="0.06" color="#c9954f"></a-plane>
-        <a-text id="info-title" value="" color="#e8c187" align="center" position="0 0.3 0.01" width="1.6"></a-text>
-        <a-text id="info-text" value="" color="#f3efe9" align="center" position="0 -0.05 0.01" width="1.45" wrap-count="38"></a-text>
+        <!-- title ≈16px, body ≈14px at viewing distance -->
+        <a-entity id="info-title" ctext="value: ; color: #e8c187; lineH: 0.105; bold: true" position="0 0.32 0.01"></a-entity>
+        <a-entity id="info-text" ctext="value: ; color: #f3efe9; lineH: 0.092; wrap: 36" position="0 -0.03 0.01"></a-entity>
         <a-plane class="clickable" data-id="close" position="0 -0.36 0.02" width="0.5" height="0.14" color="#c9954f">
-          <a-text value="Закрыть" color="#1a1410" align="center" position="0 0 0.01" width="1.2"></a-text>
+          <a-entity ctext="value: Закрыть; color: #1a1410; width: 0.4; bold: true" position="0 0 0.01"></a-entity>
         </a-plane>
       </a-entity>
     </a-camera>
@@ -255,7 +418,7 @@ function startAmbience(){
     if(windGain) return;
     const noise = makeNoiseBuffer(c);
 
-    // wind: looped noise through slow-moving lowpass
+    // wind: outside — open mountain wind; inside — deep cave draft
     const windSrc = c.createBufferSource();
     windSrc.buffer = noise; windSrc.loop = true;
     const windFilter = c.createBiquadFilter();
@@ -263,12 +426,54 @@ function startAmbience(){
     windGain = c.createGain(); windGain.gain.value = 0.035;
     windSrc.connect(windFilter); windFilter.connect(windGain); windGain.connect(c.destination);
     windSrc.start();
-    // slow wind swell
     setInterval(()=>{
       const t = c.currentTime;
-      windFilter.frequency.linearRampToValueAtTime(150+Math.random()*350, t+2.5);
-      windGain.gain.linearRampToValueAtTime(0.02+Math.random()*0.03, t+2.5);
+      if(inside){
+        // cave draft: low, hollow, slow
+        windFilter.frequency.linearRampToValueAtTime(80+Math.random()*140, t+3.5);
+        windGain.gain.linearRampToValueAtTime(0.025+Math.random()*0.025, t+3.5);
+      } else {
+        windFilter.frequency.linearRampToValueAtTime(150+Math.random()*350, t+2.5);
+        windGain.gain.linearRampToValueAtTime(0.02+Math.random()*0.03, t+2.5);
+      }
     }, 2600);
+
+    // cave rumble: very low resonant bed, fades in when inside
+    const rumbleSrc = c.createBufferSource();
+    rumbleSrc.buffer = noise; rumbleSrc.loop = true; rumbleSrc.playbackRate.value = 0.4;
+    const rumbleFilter = c.createBiquadFilter();
+    rumbleFilter.type = "lowpass"; rumbleFilter.frequency.value = 65; rumbleFilter.Q.value = 1.2;
+    const rumbleGain = c.createGain(); rumbleGain.gain.value = 0;
+    rumbleSrc.connect(rumbleFilter); rumbleFilter.connect(rumbleGain); rumbleGain.connect(c.destination);
+    rumbleSrc.start();
+    setInterval(()=>{
+      rumbleGain.gain.linearRampToValueAtTime(inside ? 0.05 : 0, c.currentTime+1.5);
+    }, 1000);
+
+    // water drips with faint echo — the cave signature
+    function drip(){
+      const t = c.currentTime;
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = "sine";
+      o.frequency.setValueAtTime(1000+Math.random()*400, t);
+      o.frequency.exponentialRampToValueAtTime(380, t+0.09);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.04+Math.random()*0.02, t+0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+0.3);
+      o.connect(g); g.connect(c.destination);
+      o.start(t); o.stop(t+0.35);
+      // echo
+      const o2 = c.createOscillator(), g2 = c.createGain();
+      o2.type = "sine";
+      o2.frequency.setValueAtTime(650, t+0.22);
+      o2.frequency.exponentialRampToValueAtTime(320, t+0.38);
+      g2.gain.setValueAtTime(0.0001, t+0.22);
+      g2.gain.linearRampToValueAtTime(0.012, t+0.23);
+      g2.gain.exponentialRampToValueAtTime(0.0001, t+0.6);
+      o2.connect(g2); g2.connect(c.destination);
+      o2.start(t+0.22); o2.stop(t+0.65);
+    }
+    setInterval(()=>{ if(inside && Math.random()<0.55) drip(); }, 2300);
 
     // fire crackle: bandpassed noise bursts (only audible inside)
     const fireSrc = c.createBufferSource();
@@ -281,10 +486,10 @@ function startAmbience(){
     setInterval(()=>{
       if(!inside) return;
       const t = c.currentTime;
-      fireGain.gain.setValueAtTime(0.008, t);
-      fireGain.gain.linearRampToValueAtTime(0.03+Math.random()*0.04, t+0.03);
-      fireGain.gain.exponentialRampToValueAtTime(0.008, t+0.12);
-    }, 180);
+      fireGain.gain.setValueAtTime(0.006, t);
+      fireGain.gain.linearRampToValueAtTime(0.02+Math.random()*0.03, t+0.03);
+      fireGain.gain.exponentialRampToValueAtTime(0.006, t+0.12);
+    }, 220);
   }catch(e){}
 }
 function chime(freqs){
@@ -400,8 +605,7 @@ window.addEventListener("DOMContentLoaded", () => {
       box.setAttribute("position", `${Math.cos(a)*r} ${y} ${Math.sin(a)*r}`);
       box.setAttribute("rotation", `0 ${-a*180/Math.PI+90} 0`);
       box.setAttribute("width","1.9"); box.setAttribute("height","0.75"); box.setAttribute("depth","0.12");
-      const shade = 46 + Math.floor(Math.random()*14);
-      box.setAttribute("color", `rgb(${shade+12},${shade+4},${shade-6})`);
+      box.setAttribute("ptex","type: stone; rx: 1.5; ry: 0.6"); // shared cached texture
       stones.appendChild(box);
     }
   }
@@ -460,9 +664,9 @@ window.addEventListener("DOMContentLoaded", () => {
     exterior.setAttribute("visible","false");
     interior.setAttribute("visible","true");
     sceneEl.setAttribute("fog","type: exponential; color: #0a0910; density: 0.055");
-    hud.setAttribute("value","Найдено: 0/3");
-    hint.textContent = "Найди три светящихся знака: очаг, оружие, тамга";
-    setTimeout(()=>speak("Ты внутри боевой башни. Найди три знака, которые хранит этот дом."), 900);
+    hud.setAttribute("ctext","value","Найдено: 0/3");
+    hint.textContent = "Три знака спрятаны в башне — они мерцают едва заметно. Осмотрись внимательно";
+    setTimeout(()=>speak("Ты внутри боевой башни. Три знака спрятаны в её тенях. Смотри внимательно."), 900);
   }
 
   document.querySelectorAll(".clickable").forEach(el=>{
@@ -481,8 +685,8 @@ window.addEventListener("DOMContentLoaded", () => {
 
       const story = STORIES[id];
       if(!story) return;
-      titleEl.setAttribute("value", story.title);
-      textEl.setAttribute("value", story.text);
+      titleEl.setAttribute("ctext","value", story.title);
+      textEl.setAttribute("ctext","value", story.text);
       panel.setAttribute("visible","true");
       chime([660, 880]);
       speak(story.text);
@@ -491,7 +695,7 @@ window.addEventListener("DOMContentLoaded", () => {
         found.add(id);
         el.setAttribute("material","color: #6b6459; emissive: #3a352c; emissiveIntensity: 0.3; opacity: 0.5");
         el.removeAttribute("animation__pulse");
-        hud.setAttribute("value", `Найдено: ${found.size}/3`);
+        hud.setAttribute("ctext","value", `Найдено: ${found.size}/3`);
       }
     });
   });
@@ -508,7 +712,7 @@ window.addEventListener("DOMContentLoaded", () => {
     flood.setAttribute("position","0 1.5 3.2");
     flood.setAttribute("animation","property: light.intensity; to: 1.6; dur: 2500");
     sceneEl.appendChild(flood);
-    hud.setAttribute("value","Наследие продолжается ✦");
+    hud.setAttribute("ctext","value","Наследие продолжается ✦");
     hint.textContent = "Наследие продолжается — обернись к двери";
     setTimeout(()=>speak("Ты нашёл наследие предков. Оно живёт сегодня в стенах Чеченского государственного университета."), 1200);
   }
