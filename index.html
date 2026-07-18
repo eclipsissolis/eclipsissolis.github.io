@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Дверь предков — VR (WebXR)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<style>
+  .hud-hint{
+    position:fixed; top:12px; left:50%; transform:translateX(-50%);
+    background:rgba(0,0,0,.6); color:#e8c187; font-family:Arial,sans-serif;
+    padding:8px 16px; border-radius:20px; font-size:14px; z-index:10; pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<div class="hud-hint">ПК: мышь + WASD, клик по меткам · VR: наведи луч контроллера и нажми триггер</div>
+
+<a-scene background="color: #0a0910" fog="type: exponential; color: #0a0910; density: 0.06" renderer="colorManagement: true">
+
+  <a-assets>
+    <a-mixin id="hotspot-glow"
+      geometry="primitive: sphere; radius: 0.14"
+      material="color: #e8c187; emissive: #c9954f; emissiveIntensity: 0.9; opacity: 0.85"
+      animation__pulse="property: scale; from: 1 1 1; to: 1.35 1.35 1.35; dir: alternate; loop: true; dur: 900; easing: easeInOutSine"></a-mixin>
+  </a-assets>
+
+  <!-- ================= TOWER INTERIOR ================= -->
+  <!-- floor -->
+  <a-circle rotation="-90 0 0" radius="4.2" color="#2a2622" roughness="1"></a-circle>
+  <!-- tower wall: open-ended cylinder, seen from inside -->
+  <a-cylinder radius="4.2" height="7" open-ended="true" position="0 3.5 0"
+    material="color: #3b352c; side: back; roughness: 1"></a-cylinder>
+  <!-- ceiling -->
+  <a-circle rotation="90 0 0" radius="4.2" position="0 7 0" color="#1c1915"></a-circle>
+
+  <!-- stone texture illusion: rings of slightly offset boxes -->
+  <a-entity id="stones"></a-entity>
+
+  <!-- loophole light beams -->
+  <a-cone position="1.8 4.6 -3.4" rotation="55 20 0" radius-bottom="0.9" radius-top="0.05" height="4"
+    material="color: #ffe9bd; opacity: 0.10; transparent: true; depthWrite: false"></a-cone>
+  <a-cone position="-2.6 5 2" rotation="55 -140 0" radius-bottom="0.7" radius-top="0.05" height="3.5"
+    material="color: #ffe9bd; opacity: 0.08; transparent: true; depthWrite: false"></a-cone>
+
+  <!-- lights -->
+  <a-entity light="type: ambient; color: #5a4d3d; intensity: 0.5"></a-entity>
+  <a-entity id="fire-light" light="type: point; color: #ff9c3f; intensity: 1.1; distance: 8" position="1.6 0.7 -2.2"></a-entity>
+  <a-entity light="type: point; color: #bcd4ff; intensity: 0.35; distance: 10" position="-2 5 2"></a-entity>
+
+  <!-- ================= HEARTH (hotspot 1) ================= -->
+  <a-entity position="1.6 0 -2.2">
+    <a-cylinder radius="0.5" height="0.25" color="#4a423a" position="0 0.12 0"></a-cylinder>
+    <!-- fire -->
+    <a-cone position="0 0.45 0" radius-bottom="0.22" radius-top="0.02" height="0.5"
+      material="color: #ff8c2b; emissive: #ff6a00; emissiveIntensity: 1; opacity: 0.95"
+      animation="property: scale; from: 1 1 1; to: 0.85 1.25 0.85; dir: alternate; loop: true; dur: 260"></a-cone>
+    <a-cone position="0.06 0.4 0.04" radius-bottom="0.12" radius-top="0.01" height="0.34"
+      material="color: #ffd257; emissive: #ffb300; emissiveIntensity: 1; opacity: 0.9"
+      animation="property: scale; from: 1 1 1; to: 1.2 0.8 1.2; dir: alternate; loop: true; dur: 200"></a-cone>
+    <a-sphere class="clickable" data-id="hearth" mixin="hotspot-glow" position="0 1.1 0"></a-sphere>
+  </a-entity>
+
+  <!-- ================= WEAPON NICHE (hotspot 2) ================= -->
+  <a-entity position="-3.6 1.6 -1.4" rotation="0 70 0">
+    <a-box width="0.12" height="1.1" depth="0.28" color="#2e2822"></a-box>
+    <!-- sheathed shashka: elongated box + hilt -->
+    <a-box position="0.12 0 0" width="0.06" height="0.95" depth="0.1" color="#5a3d24" rotation="0 0 8"></a-box>
+    <a-sphere position="0.16 0.5 0" radius="0.06" color="#c9954f" metalness="0.6" roughness="0.3"></a-sphere>
+    <a-sphere class="clickable" data-id="weapon" mixin="hotspot-glow" position="0.35 0 0.25"></a-sphere>
+  </a-entity>
+
+  <!-- ================= TAMGA CARVING (hotspot 3) ================= -->
+  <a-entity position="2.9 2.6 2.6" rotation="0 -130 0">
+    <a-plane width="0.8" height="0.8" color="#453e33"></a-plane>
+    <a-torus position="0 0 0.03" radius="0.2" radius-tubular="0.02" color="#c9954f"
+      material="emissive: #7a5a2e; emissiveIntensity: 0.4"></a-torus>
+    <a-box position="0 0 0.03" width="0.05" height="0.44" depth="0.02" color="#c9954f" rotation="0 0 45"></a-box>
+    <a-box position="0 0 0.03" width="0.05" height="0.44" depth="0.02" color="#c9954f" rotation="0 0 -45"></a-box>
+    <a-sphere class="clickable" data-id="tamga" mixin="hotspot-glow" position="0 0 0.45"></a-sphere>
+  </a-entity>
+
+  <!-- ================= DOOR (finale portal) ================= -->
+  <a-entity id="door-group" position="0 0 3.9" rotation="0 180 0">
+    <!-- frame -->
+    <a-box position="-0.65 1.1 0" width="0.18" height="2.3" depth="0.25" color="#4a4238"></a-box>
+    <a-box position="0.65 1.1 0" width="0.18" height="2.3" depth="0.25" color="#4a4238"></a-box>
+    <a-box position="0 2.28 0" width="1.5" height="0.18" depth="0.25" color="#4a4238"></a-box>
+    <!-- door leaf, pivoted -->
+    <a-entity id="door-pivot" position="-0.56 0 0">
+      <a-box id="door-leaf" position="0.56 1.08 0" width="1.1" height="2.14" depth="0.09"
+        color="#3a2a1c" material="roughness: 0.9"></a-box>
+    </a-entity>
+    <!-- bright "campus" behind the door, hidden until finale -->
+    <a-entity id="campus" visible="false" position="0 1.1 0.6">
+      <a-plane width="1.15" height="2.16" material="color: #fdf3dc; emissive: #ffedc0; emissiveIntensity: 1"></a-plane>
+      <a-text value="ЧГУ сегодня" color="#8a6a30" align="center" position="0 0.75 0.02" width="2.2"></a-text>
+      <a-box position="0 -0.1 0.05" width="0.55" height="0.7" depth="0.02" color="#ffffff"></a-box>
+      <a-box position="0 0.18 0.06" width="0.62" height="0.08" depth="0.02" color="#d8b06a"></a-box>
+      <a-cone position="-0.35 -0.35 0.06" radius-bottom="0.09" radius-top="0.01" height="0.3" color="#4c7a4c"></a-cone>
+      <a-cone position="0.37 -0.33 0.06" radius-bottom="0.08" radius-top="0.01" height="0.26" color="#548454"></a-cone>
+    </a-entity>
+  </a-entity>
+
+  <!-- ================= INFO PANEL ================= -->
+  <a-entity id="info-panel" visible="false" position="0 1.7 -1.6">
+    <a-plane width="1.7" height="0.95" color="#1e1b22" material="opacity: 0.94"
+      geometry="primitive: plane"></a-plane>
+    <a-text id="info-title" value="" color="#e8c187" align="center" position="0 0.3 0.01" width="1.6"
+      font="https://cdn.aframe.io/fonts/Exo2Bold.fnt"></a-text>
+    <a-text id="info-text" value="" color="#f3efe9" align="center" position="0 -0.05 0.01" width="1.45"
+      wrap-count="38"></a-text>
+    <a-plane class="clickable" data-id="close" position="0 -0.36 0.02" width="0.5" height="0.14" color="#c9954f">
+      <a-text value="Закрыть" color="#1a1410" align="center" position="0 0 0.01" width="1.2"></a-text>
+    </a-plane>
+  </a-entity>
+
+  <!-- ================= HUD progress (attached to camera) ================= -->
+  <a-entity id="rig" position="0 0 0.5">
+    <a-camera wasd-controls-enabled="true" look-controls>
+      <a-text id="hud-progress" value="Найдено: 0/3" color="#e8c187" position="-0.28 -0.32 -0.8" width="0.9"></a-text>
+      <!-- gaze cursor fallback (fuse) — works without controllers -->
+      <a-cursor fuse="true" fuse-timeout="1200"
+        material="color: #e8c187; shader: flat"
+        animation__fusing="property: scale; startEvents: fusing; from: 1 1 1; to: 0.4 0.4 0.4; dur: 1200"
+        animation__reset="property: scale; startEvents: mouseleave; to: 1 1 1; dur: 150"
+        raycaster="objects: .clickable"></a-cursor>
+    </a-camera>
+    <!-- VR controllers with laser -->
+    <a-entity laser-controls="hand: right" raycaster="objects: .clickable; lineColor: #e8c187; lineOpacity: 0.7"></a-entity>
+    <a-entity laser-controls="hand: left" raycaster="objects: .clickable; lineColor: #e8c187; lineOpacity: 0.7"></a-entity>
+  </a-entity>
+
+</a-scene>
+
+<script>
+const STORIES = {
+  hearth: {
+    title: "Очаг",
+    text: "Здесь, у очага, собиралась вся семья. Огонь старались не гасить: погасший очаг считался дурным знаком для дома."
+  },
+  weapon: {
+    title: "Оружие рода",
+    text: "Шашку хранили не для нападения, а для защиты рода. Оружие поднимали лишь в крайнем случае."
+  },
+  tamga: {
+    title: "Тамга",
+    text: "Родовой знак высекали на башне, чтобы потомки спустя века знали: здесь жили их предки."
+  }
+};
+
+const found = new Set();
+let finaleShown = false;
+
+/* --- audio (synth, no files) --- */
+let actx;
+function ctx(){ if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)(); return actx; }
+function chime(freqs){
+  try{
+    const c = ctx();
+    freqs.forEach((f,i)=>{
+      const o=c.createOscillator(), g=c.createGain();
+      o.type="sine"; o.frequency.value=f;
+      g.gain.setValueAtTime(0.0001,c.currentTime+i*0.1);
+      g.gain.linearRampToValueAtTime(0.06,c.currentTime+i*0.1+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+i*0.1+0.6);
+      o.connect(g); g.connect(c.destination);
+      o.start(c.currentTime+i*0.1); o.stop(c.currentTime+i*0.1+0.65);
+    });
+  }catch(e){}
+}
+
+function speak(text){
+  if(!("speechSynthesis" in window)) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "ru-RU"; u.rate = 0.95;
+  const ru = speechSynthesis.getVoices().find(v=>v.lang&&v.lang.toLowerCase().startsWith("ru"));
+  if(ru) u.voice = ru;
+  speechSynthesis.speak(u);
+}
+
+/* --- build stone ring decorations --- */
+window.addEventListener("DOMContentLoaded", () => {
+  const stones = document.getElementById("stones");
+  for(let ring=0; ring<8; ring++){
+    const y = 0.4 + ring*0.85;
+    const count = 10;
+    for(let i=0;i<count;i++){
+      const a = (i/count)*Math.PI*2 + (ring%2)*0.3;
+      const r = 4.05;
+      const box = document.createElement("a-box");
+      box.setAttribute("position", `${Math.cos(a)*r} ${y} ${Math.sin(a)*r}`);
+      box.setAttribute("rotation", `0 ${-a*180/Math.PI+90} 0`);
+      box.setAttribute("width","1.9"); box.setAttribute("height","0.75"); box.setAttribute("depth","0.12");
+      const shade = 46 + Math.floor(Math.random()*14);
+      box.setAttribute("color", `rgb(${shade+12},${shade+4},${shade-6})`);
+      stones.appendChild(box);
+    }
+  }
+
+  const panel = document.getElementById("info-panel");
+  const titleEl = document.getElementById("info-title");
+  const textEl = document.getElementById("info-text");
+  const hud = document.getElementById("hud-progress");
+
+  document.querySelectorAll(".clickable").forEach(el=>{
+    el.addEventListener("click", ()=>{
+      const id = el.dataset.id;
+
+      if(id === "close"){
+        panel.setAttribute("visible","false");
+        speechSynthesis.cancel();
+        if(found.size===3 && !finaleShown) finale();
+        return;
+      }
+
+      const story = STORIES[id];
+      if(!story) return;
+      titleEl.setAttribute("value", story.title);
+      textEl.setAttribute("value", story.text);
+      panel.setAttribute("visible","true");
+      chime([660, 880]);
+      speak(story.text);
+
+      if(!found.has(id)){
+        found.add(id);
+        el.setAttribute("material","color: #6b6459; emissive: #3a352c; emissiveIntensity: 0.3; opacity: 0.5");
+        el.removeAttribute("animation__pulse");
+        hud.setAttribute("value", `Найдено: ${found.size}/3`);
+      }
+    });
+  });
+
+  function finale(){
+    finaleShown = true;
+    chime([880, 1174, 1568]);
+    // door swings open
+    const pivot = document.getElementById("door-pivot");
+    pivot.setAttribute("animation", "property: rotation; to: 0 -110 0; dur: 2200; easing: easeInOutQuad");
+    document.getElementById("campus").setAttribute("visible","true");
+    // warm light floods in
+    const flood = document.createElement("a-entity");
+    flood.setAttribute("light","type: point; color: #ffe9bd; intensity: 0; distance: 12");
+    flood.setAttribute("position","0 1.5 3.2");
+    flood.setAttribute("animation","property: light.intensity; to: 1.6; dur: 2500");
+    document.querySelector("a-scene").appendChild(flood);
+    hud.setAttribute("value","Наследие продолжается ✦");
+    setTimeout(()=>speak("Ты нашёл наследие предков. Оно живёт сегодня в стенах Чеченского государственного университета."), 1200);
+  }
+
+  if("speechSynthesis" in window){
+    speechSynthesis.onvoiceschanged = ()=>speechSynthesis.getVoices();
+  }
+});
+</script>
+</body>
+</html>
