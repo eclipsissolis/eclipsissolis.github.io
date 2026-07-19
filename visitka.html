@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Код узора — музей ЧГУ</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  :root{--gold:#c8a24a;--gold-soft:#e6c877;--bg:#0b0b0d;--muted:#8b8778;}
+  html,body{height:100%;}
+  body{background:radial-gradient(circle at 50% 32%, rgba(200,162,74,.12), transparent 60%), var(--bg);
+    color:#eae6dc;font-family:"Georgia","Times New Roman",serif;
+    display:flex;align-items:center;justify-content:center;min-height:100vh;padding:32px;}
+  .card{width:100%;max-width:520px;text-align:center;border:1px solid #26262e;border-radius:22px;
+    padding:40px 40px 34px;background:linear-gradient(180deg,#131318,#0e0e12);
+    box-shadow:0 30px 90px rgba(0,0,0,.6);}
+  .top{font-family:Arial,sans-serif;font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:var(--muted);margin-bottom:26px;}
+  h1{font-size:52px;font-weight:normal;letter-spacing:.04em;line-height:1;}
+  .sub{color:var(--gold-soft);letter-spacing:.28em;text-transform:uppercase;font-size:12px;margin-top:12px;font-family:Arial,sans-serif;}
+  .rule{display:flex;align-items:center;gap:14px;margin:26px 0;color:var(--gold);}
+  .rule:before,.rule:after{content:"";flex:1;height:1px;background:linear-gradient(90deg,transparent,#3a3320,transparent);}
+  .rule svg{width:26px;height:26px;}
+  .qr{width:236px;height:236px;margin:0 auto;background:#fff;border-radius:16px;padding:14px;
+    box-shadow:0 0 0 1px var(--gold),0 0 30px rgba(200,162,74,.2);}
+  .qr img{width:100%;height:100%;display:block;image-rendering:pixelated;}
+  .scan{margin-top:22px;font-family:Arial,sans-serif;font-size:15px;color:#eae6dc;letter-spacing:.02em;}
+  .scan .en{display:block;color:var(--muted);font-size:12px;margin-top:3px;}
+  .url{margin-top:16px;font-family:Arial,sans-serif;font-size:15px;color:var(--gold-soft);letter-spacing:.03em;word-break:break-all;}
+  .desc{margin-top:22px;color:var(--muted);font-size:14px;line-height:1.6;}
+  .desc .en{display:block;font-size:12px;margin-top:4px;opacity:.8;}
+  @media print{
+    body{background:#fff;color:#111;}
+    .card{border-color:#ddd;background:#fff;box-shadow:none;}
+    .top,.desc,.scan .en{color:#555;}
+    .sub,.url{color:#a07b18;}
+    .qr{box-shadow:0 0 0 1px #c8a24a;}
+  }
+</style></head>
+<body>
+  <div class="card">
+    <div class="top">Современный музей ЧГУ · Digital exhibit</div>
+    <h1>Код узора</h1>
+    <div class="sub">чеченский орнамент · Chechen ornament</div>
+    <div class="rule"><svg viewBox="-50 -50 100 100" fill="none" stroke="#c8a24a" stroke-width="4"><circle r="30"/><g><line x1="14.0" y1="0.0" x2="30.0" y2="0.0"/><line x1="9.9" y1="9.9" x2="21.2" y2="21.2"/><line x1="0.0" y1="14.0" x2="0.0" y2="30.0"/><line x1="-9.9" y1="9.9" x2="-21.2" y2="21.2"/><line x1="-14.0" y1="0.0" x2="-30.0" y2="0.0"/><line x1="-9.9" y1="-9.9" x2="-21.2" y2="-21.2"/><line x1="-0.0" y1="-14.0" x2="-0.0" y2="-30.0"/><line x1="9.9" y1="-9.9" x2="21.2" y2="-21.2"/></g></svg></div>
+    <div class="qr"><img src="data:image/png;base64,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" alt="QR"></div>
+    <div class="scan">Наведите камеру телефона<span class="en">Scan with your phone camera</span></div>
+    <div class="url">bird9191.github.io/hakaton</div>
+    <div class="desc">Соберите свой узор из подлинных чеченских знаков и заберите его на телефон.
+      <span class="en">Compose your own pattern from authentic Chechen signs and take it home.</span></div>
+  </div>
+</body></html>
